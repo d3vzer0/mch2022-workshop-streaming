@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "vulnerabilities-streaming2"
+version = "0.1.0"
+description = ""
+authors = ["Joey Dreijer <jdreijer@schubergphilis.com>"]
+
+[tool.poetry.dependencies]
+python = "^3.8"
+faust = "^1.10.4"
+tweepy = "^4.10.0"
+aiohttp = "^3.8.1"
+oauthlib = "^3.2.0"
+async-lru = "^1.0.3"
+miniflux = "^0.0.14"
+dateparser = "^1.1.1"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
