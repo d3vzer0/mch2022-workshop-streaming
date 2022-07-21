@@ -13,6 +13,8 @@ oauthlib = "^3.2.0"
 async-lru = "^1.0.3"
 miniflux = "^0.0.14"
 dateparser = "^1.1.1"
+pydantic = "^1.9.1"
+elasticsearch = "^8.3.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
