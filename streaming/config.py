@@ -1,6 +1,9 @@
 import os
 
 config = {
+    'nlp': {
+        'uri': os.getenv('NLP_URI', 'http://')
+    },
     'elasticsearch': {
         'uri': os.getenv('ELASTIC_URI', 'https://localhost:9200'),
         'ca': os.getenv('ELASTIC_CA', './http_ca.crt')
@@ -17,6 +20,7 @@ config = {
     'twitter': {
         'keywords': os.getenv('TWITTER_KEYWORDS', 'CVE,vulnerability').split(','),
         'bearer': os.getenv('TWITTER_BEARER', None),
+        'index': 'twitter'
     },
     'faust': {
         'app': os.getenv('STREAM_TYPE', 'streaming.nvd'),

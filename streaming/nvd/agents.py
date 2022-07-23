@@ -6,11 +6,19 @@ from .utils.api import NVD
 from .utils.transforms import CVE
 from elasticsearch import Elasticsearch, helpers
 from ssl import create_default_context
+import aiohttp
 
 raw_cve_results = app.topic('streaming-nvd-response')
 
 context = create_default_context(cafile=config['elasticsearch']['ca'])
 es_handler = Elasticsearch([config['elasticsearch']['uri']], ssl_context=context)
+
+async def get_entities(base_uri, text):
+    uri = f'{base_uri}/extract'
+    async with aiohttp.ClientSession() as session:
+        async with session.post(uri, json={'text': text}) as resp:
+            return await resp.json()
+
 
 @app.agent(raw_cve_results)
 async def process(entries):

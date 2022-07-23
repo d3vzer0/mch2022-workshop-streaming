@@ -4,11 +4,19 @@ from .utils.transforms import TweetECS
 from .utils.records import TweetRecord
 from faust.cli import option
 from datetime import datetime
+from elasticsearch import Elasticsearch, helpers
+from ssl import create_default_context
+from tweepy.asynchronous.streaming import AsyncStreamingClient
 import tweepy
 import faust
-from tweepy.asynchronous.streaming import AsyncStreamingClient
+import aiohttp
+import json
 
 tweets_topic = app.topic('streaming-tweets', value_type=TweetRecord)
+tweets_enriched_topic = app.topic('streaming-tweets-enriched')
+
+context = create_default_context(cafile=config['elasticsearch']['ca'])
+es_handler = Elasticsearch([config['elasticsearch']['uri']], ssl_context=context)
 
 class Tweet:
     def __init__(self, tweet, includes=None):
@@ -46,11 +54,35 @@ class Tweets(AsyncStreamingClient):
         tweet = Tweet(original_tweet, includes=response.includes).to_dict
         await tweets_topic.send(value=tweet)
 
+async def get_entities(base_uri, text):
+    uri = f'{base_uri}/extract'
+    async with aiohttp.ClientSession() as session:
+        async with session.post(uri, json={'text': text}) as resp:
+            return await resp.json()
+
+
+# @app.agent(tweets_enriched_topic)
+# async def process_enriched_tweets(tweets):
+#     async for tweet in tweets:
+#         parsed_tweet = TweetECS(tweet=tweet).to_dict
+#         elastic_doc = {**parsed_tweet, '_index': config['twitter']['index'], '_id': parsed_tweet['fingerprint']}
+#         helpers.bulk(es_handler, [elastic_doc], chunk_size=1000)
+
+
+@app.agent(tweets_enriched_topic)
+async def process_enriched_tweets_print(tweets):
+    async for tweet in tweets:
+        parsed = TweetECS(tweet=tweet)
+        print(parsed.to_dict)
+
 
 @app.agent(tweets_topic)
 async def process(tweets):
     async for tweet in tweets:
-        print(tweet)
+        extract_nlp = await get_entities(config['nlp']['uri'], tweet.text)
+        tweet_as_dict = tweet.asdict()
+        enriched_tweet = {**tweet_as_dict, **extract_nlp}
+        await tweets_enriched_topic.send(value=enriched_tweet)
 
 
 @app.command(option('--filters', type=str, help='Comma seperated list of tweet keywords'))
