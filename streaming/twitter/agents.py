@@ -60,7 +60,8 @@ async def get_entities(base_uri, text):
         async with session.post(uri, json={'text': text}) as resp:
             return await resp.json()
 
-
+# This can be done much more efficiently by 
+# buffering documends and bulk uploading
 # @app.agent(tweets_enriched_topic)
 # async def process_enriched_tweets(tweets):
 #     async for tweet in tweets:

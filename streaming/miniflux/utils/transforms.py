@@ -37,6 +37,7 @@ class Transform:
             'nlp.subjectivity': self.entry['sentiment']['subjectivity'],
             'nlp.assessments': self.entry['sentiment']['assessments'],
             'vulnerability.id': self.entry['entities']['CVE'],
+            'nlp.props': self.entry['props'],
             'tags': self.entry['props'] + self.entry['entities']['PERSON'] + self.entry['entities']['CVE'] + self.entry['entities']['ORG'] + self.entry['entities']['PRODUCT'],
             'fingerprint': Transform.fingerprint(self.entry['published_at'], self.entry['hash'])
         }

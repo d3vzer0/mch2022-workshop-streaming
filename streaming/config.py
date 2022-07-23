@@ -9,7 +9,7 @@ config = {
         'ca': os.getenv('ELASTIC_CA', './http_ca.crt')
     },
     'nvd': {
-        'days': 3,
+        'days': 2,
         'max_results': 2000,
         'index': 'mch2022-nvd'
     },

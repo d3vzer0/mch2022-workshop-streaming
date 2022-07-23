@@ -69,6 +69,8 @@ async def get_entities(base_uri, text):
             return await resp.json()
 
 
+# This can be done much more efficiently by 
+# buffering documends and bulk uploading
 @app.agent(miniflux_topics_enriched)
 async def process_enriched_articles(entries):
     async for entry in entries:

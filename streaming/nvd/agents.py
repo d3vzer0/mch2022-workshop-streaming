@@ -9,6 +9,7 @@ from ssl import create_default_context
 import aiohttp
 
 raw_cve_results = app.topic('streaming-nvd-response')
+cve_results_enriched = app.topic('streaming-nvd-response-enriched')
 
 context = create_default_context(cafile=config['elasticsearch']['ca'])
 es_handler = Elasticsearch([config['elasticsearch']['uri']], ssl_context=context)
@@ -19,22 +20,28 @@ async def get_entities(base_uri, text):
         async with session.post(uri, json={'text': text}) as resp:
             return await resp.json()
 
-
+@app.agent(cve_results_enriched)
+async def process_nvd_enriched(cves):
+    async for cve in cves:
+        elastic_doc = {**cve, '_index': config['nvd']['index'], '_id': cve['fingerprint']}
+        helpers.bulk(es_handler, [elastic_doc], chunk_size=1000)
+  
 @app.agent(raw_cve_results)
 async def process(entries):
     ''' Process each CVE and split the impacted products and references, index afterwards '''
     async for entry in entries:
-        cve = CVE(cve=entry)
-        cve_details = cve.details
+        cve_description = '\n'.join([desc['value'] for desc in entry['cve']['description']['description_data']])
+        extract_nlp = await get_entities(config['nlp']['uri'], cve_description)
+        cve = CVE(cve={**entry, **extract_nlp})
         references = [{**doc, '_index': config['nvd']['index'], '_id': doc['fingerprint']}
             for doc in cve.references]
         impacted = [{**doc, '_index': config['nvd']['index'], '_id': doc['fingerprint']}
             for doc in cve.impacted]
         documents = references + impacted
-        documents.append({**cve_details, '_index': config['nvd']['index'], '_id': cve_details['fingerprint']})
         helpers.bulk(es_handler, documents, chunk_size=1000)
+        await cve_results_enriched.send(value=cve.details)
 
-@app.timer(interval=30.0)
+@app.timer(interval=10.0)
 async def get_entries() -> List[Dict]:
     ''' Get the latest CVEs from the NVD API '''
     init_date = datetime.utcnow() - timedelta(days=config['nvd']['days'])

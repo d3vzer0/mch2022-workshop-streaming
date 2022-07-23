@@ -41,6 +41,7 @@ class TweetECS:
             'nlp.subjectivity': self.tweet['sentiment']['subjectivity'],
             'nlp.assessments': self.tweet['sentiment']['assessments'],
             'vulnerability.id': self.tweet['entities']['CVE'],
+            'nlp.props': self.tweet['props'],
             'tags': self.tweet['props'] + self.tweet['entities']['PERSON'] + self.tweet['entities']['CVE'] + self.tweet['entities']['ORG'] + self.tweet['entities']['PRODUCT'],
             'fingerprint': TweetECS.fingerprint(self.tweet['created_at'], self.tweet['id'])
         }
