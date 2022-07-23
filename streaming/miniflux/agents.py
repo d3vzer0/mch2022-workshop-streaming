@@ -98,9 +98,9 @@ async def get_entries():
     rss = MinifluxRss(config['miniflux']['key'],
         config['miniflux']['host'])
 
-    entries = rss.entries(limit=10)
-    for entry in entries.to_dict[:10]:
+    entries = rss.entries(limit=50)
+    for entry in entries.to_dict:
         await miniflux_topics.send(value=entry)
-    # rss.update(entries.ids, status='read')
+    rss.update(entries.ids, status='read')
 
 
