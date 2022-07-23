@@ -11,16 +11,17 @@ config = {
     'nvd': {
         'days': 3,
         'max_results': 2000,
-        'index': 'nvd'
+        'index': 'mch2022-nvd'
     },
     'miniflux': {
-        'host': os.getenv('MINIFLUX_HOST', 'https://reader.miniflux.app'),
-        'key': os.getenv('MINIFLUX_KEY', None)
+        'host': os.getenv('MINIFLUX_HOST', 'http://localhost:8080'),
+        'key': os.getenv('MINIFLUX_KEY', None),
+        'index': 'mch2022-miniflux'
     },
     'twitter': {
         'keywords': os.getenv('TWITTER_KEYWORDS', 'CVE,vulnerability').split(','),
         'bearer': os.getenv('TWITTER_BEARER', None),
-        'index': 'twitter'
+        'index': 'mch2022-twitter'
     },
     'faust': {
         'app': os.getenv('STREAM_TYPE', 'streaming.nvd'),

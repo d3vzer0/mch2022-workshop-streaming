@@ -1,10 +1,18 @@
 from ..main import app
 from ..config import config
 from .utils.records import MinifluxRecord
-import miniflux
+from .utils.transforms import Transform
+from elasticsearch import Elasticsearch, helpers
+from ssl import create_default_context
 from tweepy.asynchronous.streaming import AsyncStreamingClient
+import aiohttp
+import miniflux
 
 miniflux_topics = app.topic('streaming-miniflux', value_type=MinifluxRecord)
+miniflux_topics_enriched = app.topic('streaming-miniflux-enriched')
+
+context = create_default_context(cafile=config['elasticsearch']['ca'])
+es_handler = Elasticsearch([config['elasticsearch']['uri']], ssl_context=context)
 
 class Entries:
     def __init__(self, entries):
@@ -28,6 +36,7 @@ class Entries:
             'published_at': entry['published_at']
         } for entry in self.entries]
 
+
 class MinifluxRss:
     def __init__(self, api_key, host):
         self.api_key = api_key
@@ -47,21 +56,51 @@ class MinifluxRss:
             self.client.get_entries(status=status, limit=limit)['entries']
         )
 
+async def clean_content(base_uri, text):
+    async with aiohttp.ClientSession() as session:
+        async with session.post(f'{base_uri}/clean', json={'text': text}) as resp:
+            clean_content = await resp.json()
+            return clean_content
+
+
+async def get_entities(base_uri, text):
+    async with aiohttp.ClientSession() as session:
+        async with session.post( f'{base_uri}/extract', json={'text': text}) as resp:
+            return await resp.json()
+
+
+@app.agent(miniflux_topics_enriched)
+async def process_enriched_articles(entries):
+    async for entry in entries:
+        parsed_article = Transform(entry=entry).to_dict
+        elastic_doc = {**parsed_article, '_index': config['miniflux']['index'], '_id': parsed_article['fingerprint']}
+        helpers.bulk(es_handler, [elastic_doc], chunk_size=1000)
+
+# @app.agent(miniflux_topics_enriched)
+# async def process_enriched_articles_print(entries):
+#     async for entry in entries:
+#         parsed = Transform(entry=entry).to_dict
+#         print(parsed)
+
 
 @app.agent(miniflux_topics)
 async def process(entries):
     async for entry in entries:
-        print(entry)
+        strip_content = await clean_content(config['nlp']['uri'], entry.content)
+        extract_nlp = await get_entities(config['nlp']['uri'], strip_content['text'])
+        entry_as_dict = entry.asdict()
+        enriched_article = {**entry_as_dict, **extract_nlp, 'clean_content': strip_content}
+        await miniflux_topics_enriched.send(value=enriched_article)
 
 
-@app.timer(interval=6.0)
+@app.timer(interval=10.0)
 async def get_entries():
     rss = MinifluxRss(config['miniflux']['key'],
         config['miniflux']['host'])
 
-    entries = rss.entries()
-    for entry in entries.to_dict:
+    entries = rss.entries(limit=10)
+    for entry in entries.to_dict[:10]:
         await miniflux_topics.send(value=entry)
-    rss.update(entries.ids, status='read')
+    # rss.update(entries.ids, status='read')
 
 
