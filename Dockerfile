@@ -1,4 +1,4 @@
-FROM python:3.9-slim AS build
+FROM python:3.8-slim AS build
 
 RUN adduser --system nonroot
 USER nonroot
