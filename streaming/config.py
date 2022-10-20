@@ -2,14 +2,14 @@ import os
 
 config = {
     'nlp': {
-        'uri': os.getenv('NLP_URI', 'http://')
+        'uri': os.getenv('NLP_URI', '')
     },
     'elasticsearch': {
         'uri': os.getenv('ELASTIC_URI', 'https://localhost:9200'),
         'ca': os.getenv('ELASTIC_CA', './http_ca.crt')
     },
     'nvd': {
-        'days': 2,
+        'days': 1,
         'max_results': 2000,
         'index': 'intel-nvd'
     },

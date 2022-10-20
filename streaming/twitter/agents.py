@@ -14,9 +14,7 @@ import json
 
 tweets_topic = app.topic('streaming-tweets', value_type=TweetRecord)
 tweets_enriched_topic = app.topic('streaming-tweets-enriched')
-
-context = create_default_context(cafile=config['elasticsearch']['ca'])
-es_handler = Elasticsearch([config['elasticsearch']['uri']], ssl_context=context)
+es_handler = Elasticsearch([config['elasticsearch']['uri']])
 
 class Tweet:
     def __init__(self, tweet, includes=None):
@@ -54,40 +52,50 @@ class Tweets(AsyncStreamingClient):
         tweet = Tweet(original_tweet, includes=response.includes).to_dict
         await tweets_topic.send(value=tweet)
 
+
 async def get_entities(base_uri, text):
+    ''' Get extracted properties from NLP API '''
     uri = f'{base_uri}/extract'
     async with aiohttp.ClientSession() as session:
         async with session.post(uri, json={'text': text}) as resp:
             return await resp.json()
 
-# This can be done much more efficiently by 
-# buffering documends and bulk uploading
-# @app.agent(tweets_enriched_topic)
-# async def process_enriched_tweets(tweets):
-#     async for tweet in tweets:
-#         parsed_tweet = TweetECS(tweet=tweet).to_dict
-#         elastic_doc = {**parsed_tweet, '_index': config['twitter']['index'], '_id': parsed_tweet['fingerprint']}
-#         helpers.bulk(es_handler, [elastic_doc], chunk_size=1000)
-
 
 @app.agent(tweets_enriched_topic)
-async def process_enriched_tweets_print(tweets):
-    async for tweet in tweets:
-        parsed = TweetECS(tweet=tweet)
-        print(parsed.to_dict)
+async def process_enriched_tweets(tweets):
+    ''' Bulk upload matching tweets '''
+    async for tweet_bulk in tweets.take(100, within=3):
+        elastic_docs = [
+             {**tweet, '_index': config['twitter']['index'], '_id': tweet['fingerprint']}
+             for tweet in tweet_bulk
+        ]
+        helpers.bulk(es_handler, elastic_docs, chunk_size=100)
+
+
+# @app.agent(tweets_enriched_topic)
+# async def process_enriched_tweets_print(tweets):
+#     ''' Simple print of tweets '''
+#     async for tweet in tweets:
+#         print(tweet)
 
 
 @app.agent(tweets_topic)
 async def process(tweets):
     async for tweet in tweets:
+        ''' Enrich tweet with basic NLP '''
         extract_nlp = await get_entities(config['nlp']['uri'], tweet.text)
         tweet_as_dict = tweet.asdict()
         enriched_tweet = {**tweet_as_dict, **extract_nlp}
-        await tweets_enriched_topic.send(value=enriched_tweet)
+        enriched_tweet['author_metrics'] = enriched_tweet['author_metrics'].asdict()
+        if enriched_tweet['public_metrics']:
+            enriched_tweet['public_metrics'] = enriched_tweet['public_metrics'].asdict() 
+        parsed_tweet = TweetECS(tweet=enriched_tweet).to_dict
+        await tweets_enriched_topic.send(value=parsed_tweet)
 
 
 @app.command(option('--filters', type=str, help='Comma seperated list of tweet keywords'))
 async def get_tweets(self, filters: str):
+    ''' Live stream tweets based on rules '''
     tweets = Tweets(config['twitter']['bearer'])
     for filter in filters.split(','):
         await tweets.add_rules(tweepy.StreamRule(filter))

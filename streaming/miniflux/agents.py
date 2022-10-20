@@ -11,8 +11,7 @@ import miniflux
 miniflux_topics = app.topic('streaming-miniflux', value_type=MinifluxRecord)
 miniflux_topics_enriched = app.topic('streaming-miniflux-enriched')
 
-context = create_default_context(cafile=config['elasticsearch']['ca'])
-es_handler = Elasticsearch([config['elasticsearch']['uri']], ssl_context=context)
+es_handler = Elasticsearch([config['elasticsearch']['uri']])
 
 class Entries:
     def __init__(self, entries):
@@ -100,9 +99,9 @@ async def get_entries():
     rss = MinifluxRss(config['miniflux']['key'],
         config['miniflux']['host'])
 
-    entries = rss.entries(limit=50)
+    entries = rss.entries(limit=10)
     for entry in entries.to_dict:
         await miniflux_topics.send(value=entry)
+        print(entry)
     rss.update(entries.ids, status='read')
-
 
